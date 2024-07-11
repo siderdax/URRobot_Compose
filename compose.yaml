@@ -1,0 +1,76 @@
+services:
+  ursim:
+    image: universalrobots/ursim_e-series
+    restart: on-failure
+    environment:
+      - ROBOT_MODEL=ur5e
+    volumes:
+      - ./ursim/urcap_storage:/urcaps
+      - ./ursim/program_storage:/ursim/programs
+    ports:
+      - 30001-30004:30001-30004
+      - 29999:29999
+      - 6080:6080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://192.168.56.101:6080"]
+      interval: 3s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+      start_interval: 10s
+    networks:
+      ur_net:
+        ipv4_address: 192.168.56.101
+  
+  urdriver:
+    image: urdriver
+    restart: always
+    environment:
+      - ROBOT_MODEL=ur5e
+      - ROBOT_IP=192.168.56.101
+    build:
+      context: ur_driver
+      dockerfile: Dockerfile
+    networks:
+      ur_net:
+        ipv4_address: 192.168.56.100
+    depends_on:
+      ursim:
+        condition: service_healthy
+        required: true
+        restart: true
+
+  mosquitto:
+    image: eclipse-mosquitto
+    restart: always
+    ports:
+      - 1884:1883
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      ur_net:
+        ipv4_address: 192.168.56.2
+
+  ros_mqtt:
+    build:
+      context: ros_mqtt
+      dockerfile: Dockerfile
+    environment:
+      - MQTT_HOST=192.168.56.2
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=urscript
+      - MQTT_ROLE=subscriber
+      - NODE_NAME=urscript_mqtt_sub
+      - ROS_TOPIC_NAME=/urscript_interface/script_command
+    networks:
+      ur_net:
+        ipv4_address: 192.168.56.102
+    depends_on:
+      - mosquitto
+
+networks:
+  ur_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.56.0/24
