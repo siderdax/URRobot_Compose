@@ -68,6 +68,30 @@ services:
     depends_on:
       - mosquitto
 
+  rtde:
+    build:
+      context: rtde
+      dockerfile: Dockerfile
+    environment:
+      - RTDE_HOST=192.168.56.101
+      - CONFIG_PATH=./configuration.xml
+      - FREQUENCY=10
+      - MQTT_HOST=192.168.56.2
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=urRTDE
+    networks:
+      ur_net:
+        ipv4_address: 192.168.56.103
+    depends_on:
+      mosquitto:
+        condition: service_started
+        required: true
+        restart: true
+      ursim:
+        condition: service_healthy
+        required: true
+        restart: true
+
 networks:
   ur_net:
     driver: bridge
